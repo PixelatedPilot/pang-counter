@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>The Pang Counter - Lecture Self-Citation Tracker</title>
+  
+  <!-- SEO & Social Meta -->
+  <meta name="description" content="A live comedic counter tracking how many times the professor cites their own papers during lecture.">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <!-- Favicon (Red glowing LED digital icon) -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23000'/><text x='50%' y='68%' font-size='60' font-family='sans-serif' font-weight='900' fill='%23ff2a2a' text-anchor='middle'>00</text></svg>">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&family=Fredoka:wght@600;700&family=Bangers&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-color: #000000;
+      --led-active: #ff2a2a;
+      --led-glow: rgba(255, 42, 42, 0.7);
+      --led-inactive: rgba(255, 30, 30, 0.08);
+      --btn-bg: #f8f9fa;
+      --btn-text: #4a4a4a;
+      --btn-shadow: rgba(0, 0, 0, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      background-color: #0a0a0c;
+      color: #ffffff;
+      font-family: 'Fredoka', 'Comic Neue', 'Comic Sans MS', 'Chalkboard SE', cursive, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow-x: hidden;
+      touch-action: manipulation;
+    }
+
+    /* Outer phone container */
+    .app-wrapper {
+      width: 100%;
+      max-width: 420px;
+      height: 100vh;
+      max-height: 900px;
+      background-color: var(--bg-color);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2.2rem 1.5rem 1.8rem;
+      position: relative;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      border-radius: 40px;
+      overflow: hidden;
+    }
+
+    @media (max-width: 480px) {
+      .app-wrapper {
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 2.4rem 1.25rem 1.8rem;
+      }
+    }
+
+    /* Top Title */
+    .title-container {
+      width: 100%;
+      text-align: center;
+      margin-top: 0.5rem;
+      z-index: 2;
+    }
+
+    .main-title {
+      font-family: 'Comic Neue', 'Fredoka', 'Comic Sans MS', cursive, sans-serif;
+      font-size: 2.1rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #ffffff;
+      text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.8), 0 0 15px rgba(255, 255, 255, 0.15);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: transform 0.15s ease;
+    }
+
+    .main-title:active {
+      transform: scale(0.98);
+    }
+
+    .edit-hint {
+      font-size: 0.8rem;
+      opacity: 0.35;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-weight: normal;
+      vertical-align: middle;
+    }
+
+    /* Counter Display Stage */
+    .counter-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      flex-grow: 1;
+      margin: 1.2rem 0;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* 7-Segment SVG Container */
+    .digits-display {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      filter: drop-shadow(0 0 20px var(--led-glow));
+      transform: skewX(-4deg);
+      transition: transform 0.08s ease-out;
+      cursor: pointer;
+    }
+
+    .digits-display.pulse {
+      animation: digit-bump 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes digit-bump {
+      0% { transform: skewX(-4deg) scale(1); }
+      50% { transform: skewX(-4deg) scale(1.08); filter: drop-shadow(0 0 35px #ff4444); }
+      100% { transform: skewX(-4deg) scale(1); }
+    }
+
+    .segment-digit {
+      width: 110px;
+      height: 200px;
+    }
+
+    @media (max-height: 700px) {
+      .segment-digit {
+        width: 90px;
+        height: 165px;
+      }
+    }
+
+    .seg {
+      fill: var(--led-inactive);
+      transition: fill 0.06s ease-in-out, filter 0.06s ease-in-out;
+    }
+
+    .seg.on {
+      fill: var(--led-active);
+      filter: drop-shadow(0 0 4px var(--led-glow));
+    }
+
+    /* Subtitle */
+    .subtitle-container {
+      text-align: center;
+      width: 100%;
+      margin-top: 1.6rem;
+      z-index: 2;
+    }
+
+    .subtitle {
+      font-family: 'Comic Neue', 'Fredoka', 'Comic Sans MS', cursive, sans-serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      line-height: 1.25;
+      text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.9);
+    }
+
+    .citation-ticker {
+      font-size: 0.82rem;
+      color: #ff9999;
+      margin-top: 0.4rem;
+      min-height: 1.2rem;
+      opacity: 0.9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-weight: 500;
+      font-style: italic;
+      transition: opacity 0.2s ease;
+    }
+
+    /* Action Container */
+    .action-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-top: 0.8rem;
+      z-index: 2;
+    }
+
+    .btn-cite {
+      width: 100%;
+      max-width: 340px;
+      background-color: var(--btn-bg);
+      color: var(--btn-text);
+      font-family: 'Comic Neue', 'Fredoka', 'Comic Sans MS', cursive, sans-serif;
+      font-size: 1.22rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: none;
+      outline: none;
+      padding: 1.1rem 1.2rem;
+      border-radius: 20px;
+      cursor: pointer;
+      box-shadow: 0 8px 0 #cfd4dc, 0 12px 25px rgba(0, 0, 0, 0.5);
+      transform: translateY(0);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.1s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-cite:hover {
+      background-color: #ffffff;
+    }
+
+    .btn-cite:active {
+      transform: translateY(6px);
+      box-shadow: 0 2px 0 #cfd4dc, 0 4px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Secondary Controls */
+    .controls-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 0.2rem;
+    }
+
+    .tool-btn {
+      background: rgba(255, 255, 255, 0.08);
+      color: #b0b0b8;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 6px 11px;
+      font-size: 0.76rem;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+
+    .tool-btn:hover {
+      background: rgba(255, 255, 255, 0.16);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .tool-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Floating Citation Particles */
+    .particle {
+      position: absolute;
+      pointer-events: none;
+      font-weight: bold;
+      z-index: 100;
+      animation: float-up 1.2s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+      opacity: 1;
+    }
+
+    @keyframes float-up {
+      0% {
+        transform: translate(0, 0) scale(0.7) rotate(0deg);
+        opacity: 1;
+      }
+      80% {
+        opacity: 0.9;
+      }
+      100% {
+        transform: translate(var(--tx), -160px) scale(1.15) rotate(var(--rot));
+        opacity: 0;
+      }
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-30px);
+      background: rgba(20, 20, 24, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 30px;
+      font-size: 0.85rem;
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* Edit Name Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      padding: 1.5rem;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #18181b;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+    }
+
+    .modal-box h3 {
+      font-size: 1.2rem;
+      margin-bottom: 0.8rem;
+      color: #fff;
+    }
+
+    .modal-box input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      border: 1px solid #3f3f46;
+      background: #09090b;
+      color: #fff;
+      font-size: 1.1rem;
+      text-align: center;
+      outline: none;
+      margin-bottom: 1rem;
+    }
+
+    .modal-box input:focus {
+      border-color: #ff3333;
+    }
+
+    .modal-btns {
+      display: flex;
+      gap: 10px;
+    }
+
+    .modal-btns button {
+      flex: 1;
+      padding: 0.65rem 0.8rem;
+      border-radius: 10px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-confirm {
+      background: #ff3333;
+      color: #fff;
+    }
+
+    .btn-cancel {
+      background: #27272a;
+      color: #a1a1aa;
+    }
+
+    /* History Drawer */
+    .history-drawer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #141417;
+      border-top: 1px solid #27272a;
+      border-radius: 24px 24px 0 0;
+      padding: 1.2rem 1.5rem 1.8rem;
+      transform: translateY(105%);
+      transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+      z-index: 50;
+      max-height: 60%;
+      overflow-y: auto;
+    }
+
+    .history-drawer.open {
+      transform: translateY(0);
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
+    }
+
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #27272a;
+    }
+
+    .history-list {
+      list-style: none;
+      font-family: monospace;
+      font-size: 0.82rem;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 6px;
+    }
+
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      color: #a1a1aa;
+      padding: 4px 0;
+    }
+
+    .history-item .num {
+      color: #ff5555;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">Copied link to clipboard!</div>
+
+  <div class="app-wrapper">
+    <!-- Top Title (Click to rename) -->
+    <div class="title-container">
+      <div class="main-title" id="titleText" title="Click to edit professor's name">
+        <span>THE PANG COUNTER</span>
+        <span class="edit-hint">✎</span>
+      </div>
+    </div>
+
+    <!-- 7-Segment Digital Display -->
+    <div class="counter-stage">
+      <div class="digits-display" id="displayBoard" title="Tap to increment (+1)">
+        <!-- Digit 1 (Tens) -->
+        <svg class="segment-digit" id="digit1" viewBox="0 0 68 116">
+          <polygon id="d1_a" class="seg on" points="14,10 22,2 46,2 54,10 46,18 22,18" />
+          <polygon id="d1_b" class="seg on" points="56,12 64,20 64,48 56,56 48,48 48,20" />
+          <polygon id="d1_c" class="seg on" points="56,60 64,68 64,96 56,104 48,96 48,68" />
+          <polygon id="d1_d" class="seg on" points="14,106 22,98 46,98 54,106 46,114 22,114" />
+          <polygon id="d1_e" class="seg on" points="12,60 20,68 20,96 12,104 4,96 4,68" />
+          <polygon id="d1_f" class="seg on" points="12,12 20,20 20,48 12,56 4,48 4,20" />
+          <polygon id="d1_g" class="seg" points="14,58 22,50 46,50 54,58 46,66 22,66" />
+        </svg>
+
+        <!-- Digit 2 (Ones) -->
+        <svg class="segment-digit" id="digit2" viewBox="0 0 68 116">
+          <polygon id="d2_a" class="seg on" points="14,10 22,2 46,2 54,10 46,18 22,18" />
+          <polygon id="d2_b" class="seg on" points="56,12 64,20 64,48 56,56 48,48 48,20" />
+          <polygon id="d2_c" class="seg on" points="56,60 64,68 64,96 56,104 48,96 48,68" />
+          <polygon id="d2_d" class="seg on" points="14,106 22,98 46,98 54,106 46,114 22,114" />
+          <polygon id="d2_e" class="seg on" points="12,60 20,68 20,96 12,104 4,96 4,68" />
+          <polygon id="d2_f" class="seg on" points="12,12 20,20 20,48 12,56 4,48 4,20" />
+          <polygon id="d2_g" class="seg" points="14,58 22,50 46,50 54,58 46,66 22,66" />
+        </svg>
+
+        <!-- Digit 3 (Shown for 100+) -->
+        <svg class="segment-digit" id="digit3" style="display:none;" viewBox="0 0 68 116">
+          <polygon id="d3_a" class="seg" points="14,10 22,2 46,2 54,10 46,18 22,18" />
+          <polygon id="d3_b" class="seg" points="56,12 64,20 64,48 56,56 48,48 48,20" />
+          <polygon id="d3_c" class="seg" points="56,60 64,68 64,96 56,104 48,96 48,68" />
+          <polygon id="d3_d" class="seg" points="14,106 22,98 46,98 54,106 46,114 22,114" />
+          <polygon id="d3_e" class="seg" points="12,60 20,68 20,96 12,104 4,96 4,68" />
+          <polygon id="d3_f" class="seg" points="12,12 20,20 20,48 12,56 4,48 4,20" />
+          <polygon id="d3_g" class="seg" points="14,58 22,50 46,50 54,58 46,66 22,66" />
+        </svg>
+      </div>
+
+      <!-- Subtitle -->
+      <div class="subtitle-container">
+        <div class="subtitle" id="subTitleText">PANG'S PAPER MENTIONS<br>TODAY</div>
+        <div class="citation-ticker" id="citationTicker">Waiting for citation #1 today...</div>
+      </div>
+    </div>
+
+    <!-- Bottom Button and Quick Tools -->
+    <div class="action-container">
+      <button class="btn-cite" id="btnCite" aria-label="Add Citation">
+        <span id="btnText">PANG CITED IT AGAIN!</span>
+      </button>
+
+      <div class="controls-row">
+        <button class="tool-btn" id="btnUndo" title="Subtract 1 if misclicked">
+          ↩ Undo
+        </button>
+        <button class="tool-btn" id="btnReset" title="Reset counter to 0">
+          ↺ Reset
+        </button>
+        <button class="tool-btn" id="btnSound" title="Toggle sound fx">
+          🔊 Sound
+        </button>
+        <button class="tool-btn" id="btnLog" title="View citation timestamps">
+          📋 Log
+        </button>
+        <button class="tool-btn" id="btnShare" title="Share with classmates">
+          🔗 Share
+        </button>
+      </div>
+    </div>
+
+    <!-- History Drawer -->
+    <div class="history-drawer" id="historyDrawer">
+      <div class="history-header">
+        <strong style="color: #fff; font-size: 0.95rem;">Citation Log Today</strong>
+        <button class="tool-btn" id="btnCloseDrawer">Close</button>
+      </div>
+      <ul class="history-list" id="historyList">
+        <li style="color:#666; text-align:center;">No citations recorded yet today.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Edit Name Modal -->
+  <div class="modal-backdrop" id="nameModal">
+    <div class="modal-box">
+      <h3>Change Professor Name</h3>
+      <input type="text" id="nameInput" placeholder="Enter professor's name" maxlength="18" value="PANG">
+      <div class="modal-btns">
+        <button class="btn-cancel" id="btnCancelName">Cancel</button>
+        <button class="btn-confirm" id="btnSaveName">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // URL Params support (e.g. ?prof=Smith&start=0)
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramProf = urlParams.get('prof');
+    if (paramProf) {
+      localStorage.setItem('pang_prof_name', paramProf.toUpperCase());
+    }
+
+    // State: Starts at 0
+    let profName = localStorage.getItem('pang_prof_name') || 'PANG';
+    let count = parseInt(localStorage.getItem('pang_counter_value') || '0', 10);
+    let soundEnabled = localStorage.getItem('pang_sound') !== 'false';
+    let historyLogs = JSON.parse(localStorage.getItem('pang_history_logs') || '[]');
+
+    // Elements
+    const titleText = document.getElementById('titleText');
+    const subTitleText = document.getElementById('subTitleText');
+    const btnText = document.getElementById('btnText');
+    const btnCite = document.getElementById('btnCite');
+    const displayBoard = document.getElementById('displayBoard');
+    const btnUndo = document.getElementById('btnUndo');
+    const btnReset = document.getElementById('btnReset');
+    const btnSound = document.getElementById('btnSound');
+    const btnLog = document.getElementById('btnLog');
+    const btnShare = document.getElementById('btnShare');
+    const citationTicker = document.getElementById('citationTicker');
+    const historyDrawer = document.getElementById('historyDrawer');
+    const btnCloseDrawer = document.getElementById('btnCloseDrawer');
+    const historyList = document.getElementById('historyList');
+    const toast = document.getElementById('toast');
+
+    // Modals
+    const nameModal = document.getElementById('nameModal');
+    const nameInput = document.getElementById('nameInput');
+    const btnCancelName = document.getElementById('btnCancelName');
+    const btnSaveName = document.getElementById('btnSaveName');
+
+    // Fun quotes/paper titles to cycle through
+    const citationQuotes = [
+      `"As my seminal 2019 paper demonstrated..."`,
+      `"If you read section 4.2 of my dissertation..."`,
+      `"The framework introduced by me & team..."`,
+      `"I actually coined this term back in 2016..."`,
+      `"See Figure 3 in my IEEE transactions paper..."`,
+      `"We actually proved this theorem in our lab..."`,
+      `"My co-authors and I first observed this anomaly..."`,
+      `"Naturally, my 2021 survey paper covers this in depth..."`,
+      `"As cited by over 40 other people (including myself 30 times)..."`,
+      `"I won't re-explain it, just download my preprint..."`
+    ];
+
+    const particleTexts = [
+      "+1 Self-Citation!",
+      "📚 Self-Ref!",
+      "📈 H-Index ↑",
+      "🏆 [Ibid.]",
+      "🎓 In My Paper...",
+      "📑 [Pang et al.]",
+      "⚡ Certified Classic"
+    ];
+
+    // 7-segment digit map: a, b, c, d, e, f, g
+    const SEG_MAP = {
+      '0': [1, 1, 1, 1, 1, 1, 0],
+      '1': [0, 1, 1, 0, 0, 0, 0],
+      '2': [1, 1, 0, 1, 1, 0, 1],
+      '3': [1, 1, 1, 1, 0, 0, 1],
+      '4': [0, 1, 1, 0, 0, 1, 1],
+      '5': [1, 0, 1, 1, 0, 1, 1],
+      '6': [1, 0, 1, 1, 1, 1, 1],
+      '7': [1, 1, 1, 0, 0, 0, 0],
+      '8': [1, 1, 1, 1, 1, 1, 1],
+      '9': [1, 1, 1, 1, 0, 1, 1]
+    };
+
+    const SEG_KEYS = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+
+    function applyDigitSegments(prefix, digitChar) {
+      const segs = SEG_MAP[digitChar] || [0, 0, 0, 0, 0, 0, 0];
+      SEG_KEYS.forEach((key, idx) => {
+        const el = document.getElementById(`${prefix}_${key}`);
+        if (!el) return;
+        if (segs[idx] === 1) {
+          el.classList.add('on');
+        } else {
+          el.classList.remove('on');
+        }
+      });
+    }
+
+    function updateProfNameUI() {
+      const clean = profName.toUpperCase().trim() || 'PANG';
+      titleText.innerHTML = `<span>THE ${clean} COUNTER</span> <span class="edit-hint">✎</span>`;
+      subTitleText.innerHTML = `${clean}'S PAPER MENTIONS<br>TODAY`;
+      btnText.textContent = `${clean} CITED IT AGAIN!`;
+    }
+
+    function renderDisplay(animate = false) {
+      if (count < 0) count = 0;
+      let str = count.toString();
+
+      const digit3 = document.getElementById('digit3');
+
+      if (count < 100) {
+        str = str.padStart(2, '0');
+        digit3.style.display = 'none';
+        applyDigitSegments('d1', str[0]);
+        applyDigitSegments('d2', str[1]);
+      } else {
+        digit3.style.display = 'block';
+        if (str.length > 3) str = str.slice(-3);
+        applyDigitSegments('d1', str[0]);
+        applyDigitSegments('d2', str[1]);
+        applyDigitSegments('d3', str[2]);
+      }
+
+      if (animate) {
+        displayBoard.classList.remove('pulse');
+        void displayBoard.offsetWidth;
+        displayBoard.classList.add('pulse');
+      }
+
+      localStorage.setItem('pang_counter_value', count.toString());
+      renderHistory();
+    }
+
+    // Web Audio Synthesizer
+    let audioCtx = null;
+    function playCashChime() {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const now = audioCtx.currentTime;
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        osc1.type = 'triangle';
+        osc1.frequency.setValueAtTime(880, now);
+        osc1.frequency.exponentialRampToValueAtTime(1760, now + 0.08);
+
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1320, now + 0.04);
+        osc2.frequency.exponentialRampToValueAtTime(2640, now + 0.12);
+
+        gainNode.gain.setValueAtTime(0.3, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+        osc1.connect(gainNode);
+        osc2.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        osc1.start(now);
+        osc2.start(now + 0.04);
+        osc1.stop(now + 0.45);
+        osc2.stop(now + 0.45);
+      } catch (e) {}
+    }
+
+    function playUndoChime() {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(320, now + 0.15);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      } catch (e) {}
+    }
+
+    function spawnParticle(x, y) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+
+      const text = particleTexts[Math.floor(Math.random() * particleTexts.length)];
+      p.textContent = text;
+      
+      const colors = ['#ff4444', '#ffdd59', '#48dbfb', '#1dd1a1', '#ffffff'];
+      p.style.color = colors[Math.floor(Math.random() * colors.length)];
+      p.style.fontSize = (0.95 + Math.random() * 0.35) + 'rem';
+      
+      const appWrapper = document.querySelector('.app-wrapper');
+      const rect = appWrapper.getBoundingClientRect();
+
+      const posX = (x ? x - rect.left : rect.width / 2) + (Math.random() * 80 - 40);
+      const posY = (y ? y - rect.top : rect.height * 0.65) + (Math.random() * 40 - 20);
+
+      p.style.left = posX + 'px';
+      p.style.top = posY + 'px';
+      
+      const tx = (Math.random() * 120 - 60) + 'px';
+      const rot = (Math.random() * 40 - 20) + 'deg';
+      p.style.setProperty('--tx', tx);
+      p.style.setProperty('--rot', rot);
+
+      appWrapper.appendChild(p);
+      setTimeout(() => p.remove(), 1250);
+    }
+
+    function increment(e) {
+      count++;
+      playCashChime();
+      renderDisplay(true);
+
+      const quote = citationQuotes[Math.floor(Math.random() * citationQuotes.length)];
+      citationTicker.textContent = quote.replace(/my|me/gi, (match) => {
+        return profName.toUpperCase() === 'PANG' ? match : `${profName}'s`;
+      });
+
+      let clientX, clientY;
+      if (e && e.clientX) {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+      spawnParticle(clientX, clientY);
+
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      historyLogs.push({ count, time: timeStr });
+      if (historyLogs.length > 50) historyLogs.shift();
+      localStorage.setItem('pang_history_logs', JSON.stringify(historyLogs));
+    }
+
+    function decrement() {
+      if (count > 0) {
+        count--;
+        playUndoChime();
+        renderDisplay(true);
+        citationTicker.textContent = "Citation retracted! (Misheard citation)";
+        if (historyLogs.length > 0) {
+          historyLogs.pop();
+          localStorage.setItem('pang_history_logs', JSON.stringify(historyLogs));
+        }
+      }
+    }
+
+    function resetCounter() {
+      if (confirm(`Reset ${profName}'s citation count to 0?`)) {
+        count = 0;
+        historyLogs = [];
+        localStorage.setItem('pang_history_logs', JSON.stringify([]));
+        citationTicker.textContent = "Clean slate for today's lecture.";
+        renderDisplay(true);
+      }
+    }
+
+    function renderHistory() {
+      if (historyLogs.length === 0) {
+        historyList.innerHTML = `<li style="color:#666; text-align:center;">No citations recorded yet today.</li>`;
+        return;
+      }
+      historyList.innerHTML = historyLogs.map(item => `
+        <li class="history-item">
+          <span><span class="num">#${item.count}</span> Self-citation noted</span>
+          <span>${item.time}</span>
+        </li>
+      `).join('');
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    // Listeners
+    btnCite.addEventListener('click', (e) => increment(e));
+    displayBoard.addEventListener('click', (e) => increment(e));
+    btnUndo.addEventListener('click', decrement);
+    btnReset.addEventListener('click', resetCounter);
+
+    // Share link
+    btnShare.addEventListener('click', () => {
+      const shareUrl = window.location.href.split('?')[0];
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          showToast("📋 Link copied! Send it to your classmates!");
+        });
+      } else {
+        showToast("URL: " + shareUrl);
+      }
+    });
+
+    // Sound toggle
+    btnSound.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      localStorage.setItem('pang_sound', soundEnabled);
+      btnSound.textContent = soundEnabled ? '🔊 Sound' : '🔇 Muted';
+      btnSound.style.opacity = soundEnabled ? '1' : '0.6';
+    });
+    btnSound.textContent = soundEnabled ? '🔊 Sound' : '🔇 Muted';
+    btnSound.style.opacity = soundEnabled ? '1' : '0.6';
+
+    // History drawer
+    btnLog.addEventListener('click', () => historyDrawer.classList.toggle('open'));
+    btnCloseDrawer.addEventListener('click', () => historyDrawer.classList.remove('open'));
+
+    // Rename modal
+    titleText.addEventListener('click', () => {
+      nameInput.value = profName;
+      nameModal.classList.add('open');
+      setTimeout(() => nameInput.focus(), 100);
+    });
+
+    btnCancelName.addEventListener('click', () => nameModal.classList.remove('open'));
+    btnSaveName.addEventListener('click', () => {
+      const val = nameInput.value.trim();
+      if (val) {
+        profName = val.toUpperCase();
+        localStorage.setItem('pang_prof_name', profName);
+        updateProfNameUI();
+      }
+      nameModal.classList.remove('open');
+    });
+
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') btnSaveName.click();
+      if (e.key === 'Escape') btnCancelName.click();
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (nameModal.classList.contains('open')) return;
+      if (e.code === 'Space' || e.code === 'Enter' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        increment();
+      } else if (e.key === 'ArrowDown' || e.key === 'Backspace') {
+        decrement();
+      } else if (e.key === 'r' || e.key === 'R') {
+        resetCounter();
+      }
+    });
+
+    // Initial setup
+    updateProfNameUI();
+    if (count === 0) {
+      citationTicker.textContent = "Waiting for citation #1 today...";
+    }
+    renderDisplay();
+  </script>
+</body>
+</html>
